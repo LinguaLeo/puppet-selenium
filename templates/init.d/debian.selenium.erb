@@ -49,14 +49,12 @@ SLNM_JAR="${SLNM_INSTALL_ROOT}/jars/${SLNM_JAR_NAME}"
 #[ -e /etc/sysconfig/$prog ] && . /etc/sysconfig/$prog
 
 lockfile=/var/lock/subsys/$prog
-pidfile=/var/run/${prog}.pid
+PIDFILE=/var/run/${prog}.pid
 
 # pidfile must be owned by selenium user
 
 [ -r /etc/default/$NAME ] && . /etc/default/$NAME
 
-DAEMON=/usr/bin/daemon
-DAEMON_ARGS="--name=$NAME --inherit --output=$SELENIUMNODE_SLAVE_LOG --pidfile=$PIDFILE"
 
 SU=/bin/su
 
@@ -89,6 +87,9 @@ if [ `id -u` -ne 0 ]; then
     exit 1
 fi
 
+
+EXEC="$JAVA $JAVA_ARGS -jar $SLNM_JAR $SLNM_ARGS"
+
 #
 # Function that starts the daemon/service
 #
@@ -106,8 +107,9 @@ do_start()
     #   0 if daemon has been started
     #   1 if daemon was already running
     #   2 if daemon could not be started
-    $DAEMON $DAEMON_ARGS --running && return 1
-
+    #$DAEMON $DAEMON_ARGS --running && return 1
+    start-stop-daemon --start --quite --pidfile $PIDFILE --exec $EXEC --test > /dev/null \
+      || return 1
     # If the var MAXOPENFILES is enabled in /etc/default/jenkins then set the max open files to the
     # proper value
     if [ -n "$MAXOPENFILES" ]; then
@@ -117,8 +119,8 @@ do_start()
 
     # --user in daemon doesn't prepare environment variables like HOME, USER, LOGNAME or USERNAME,
     # so we let su do so for us now
-echo " $SU -l $SELENIUMNODE_SLAVE_USER --shell=/bin/bash -c $DAEMON $DAEMON_ARGS -- $JAVA $JAVA_ARGS -jar $SLNM_JAR $SLNM_ARGS"
-    $SU -l $SELENIUMNODE_SLAVE_USER --shell=/bin/bash -c "$DAEMON $DAEMON_ARGS -- $JAVA $JAVA_ARGS -jar $SLNM_JAR $SLNM_ARGS" || return 2
+    echo "start-stop-daemon --start --quite --pidfile $PIDFILE --exec $EXEC"
+    start-stop-daemon --start --quite --pidfile $PIDFILE --exec $EXEC || return 2
 }
 
 
@@ -133,16 +135,18 @@ get_running()
 
 force_stop()
 {
-    get_running
-    if [ $? -ne 0 ]; then
-  killall -u $SLNM_USER java daemon || return 3
-    fi
+  start-stop-daemon --stop --oknodo --user $SLNM_USER --name $NAME --pidfile $PIDFILE --retry=TERM/30/KILL/5
 }
+
+stop(){
+  start-stop-daemon --stop --oknodo --user $SLNM_USER --name $NAME --pidfile $PIDFILE --retry 5
+}
+
 
 # Get the status of the daemon process
 get_daemon_status()
 {
-    $DAEMON $DAEMON_ARGS --running || return 1
+    start-stop-daemon --status 
 }
 
 
@@ -159,11 +163,11 @@ do_stop()
     get_daemon_status
     case "$?" in
   0)
-      $DAEMON $DAEMON_ARGS --stop || return 2
+        stop() || return 2
         # wait for the process to really terminate
         for n in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do
             sleep 1
-            $DAEMON $DAEMON_ARGS --running || break
+            #$DAEMON $DAEMON_ARGS --running || break
         done
         if get_daemon_status; then
           force_stop || return 3

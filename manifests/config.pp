@@ -23,45 +23,18 @@ define selenium::config(
   $prog = "selenium${name}"
 
 
-case $::osfamily {
-  'redhat': {
-    file { "/etc/init.d/${prog}":
-      ensure  => 'file',
-      owner   => 'root',
-      group   => 'root',
-      mode    => '0755',
-      content => template("${module_name}/init.d/selenium.erb"),
-    } ~>
-    service { $prog:
-      ensure     => running,
-      hasstatus  => true,
-      hasrestart => true,
-      enable     => true,
-    }
+  file { "/etc/init.d/${prog}":
+    ensure  => 'file',
+    owner   => 'root',
+    group   => 'root',
+    mode    => '0755',
+    content => template("${module_name}/init.d/${selenium::params::service_template}"),
+  } ~>
+  service { $prog:
+    ensure     => running,
+    hasstatus  => true,
+    hasrestart => true,
+    enable     => true,
   }
-  'Debian': {
-    file {"/etc/init.d/$prog":
-      ensure => 'file',
-      owner  => 'root',
-      group  => 'root',
-      mode   => '0755',
-      content=> template("${module_name}/init.d/debian.selenium.erb"),
-      }~>
-    service {$prog:
-      ensure    => running,
-      hasstatus => true,
-      hasrestart=> true,
-      enable    => true,
-    }
-  }
-  default: {
-      fail("Module ${module_name} is not supported on ${::operatingsystem}")
-    }
-  }
-
-
-
-
-
 
 }
