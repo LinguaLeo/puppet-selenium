@@ -77,7 +77,7 @@ class selenium(
   }
 
   logrotate::rule { 'selenium':
-    path          => $log_path,
+    path          => "${log_path}/*",
     rotate_every  => 'weekly',
     missingok     => true,
     rotate        => 4,
